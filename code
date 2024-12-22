@@ -1,0 +1,364 @@
+
+def create_database():
+    '''
+    Creates a new database by asking the user for field names, column widths,
+    and initial records. Saves the database to a file and creating two more files of the created database.
+    Displays the created database in a table format.
+    '''
+    # Ask for a database name and create/open the file
+    db_name = input("Enter a name for your new database (without extension): ")
+
+    # Save the database name in a config file
+    with open("databases_config.txt", "a") as config_file:
+        config_file.write(db_name + "\n")
+
+    with open(f"{db_name}.txt", "w") as db_file, open(f"{db_name}_config.txt", "w") as config_file:
+        # Get the number of fields with error handling
+        while True:
+            try:
+                input_fields = int(input("How many fields do you want to enter? "))
+                if input_fields <= 0:
+                    print("Number of fields must be greater than 0. Please try again.")
+                    continue
+                break
+            except ValueError:
+                print("Invalid input! Please enter a positive number.")
+
+        fields = []
+        column_widths = {}
+
+        # Collect field names and their specific column widths
+        for i in range(1, input_fields + 1):
+            field = input(f"Enter name for field {i} : ")
+            field = field.upper()
+            fields.append(field)
+            while True: # for error handling
+                try:
+                    width = int(input(f"Enter the width for the column of field '{field}': "))
+                    if width <= 0:
+                        print("Width must be a positive integer. Please try again.")
+                        continue
+                    column_widths[field] = width  # Store the width for each field
+                    break  # Exit the loop if input is valid
+                except ValueError:
+                    print("Invalid input! Please enter a positive integer.")
+
+            column_widths[field] = width  # Store the width for each field
+
+        # Save field names to the database file and their widths to the config file
+        db_file.write(", ".join(fields) + "\n")  # Save field names
+        config_file.write("\n".join(f"{field}:{column_widths[field]}" for field in fields))  # Save field-width pairs
+
+        # Collect and save data for each record
+        records = []
+        while True:
+            record = []
+            for field in fields:
+                input_data = input(f"Enter data for {field} field (or type 'exit' to finish): ")
+                if input_data.lower() == 'exit':
+                    break
+                record.append(input_data)
+            if input_data.lower() == 'exit':
+                break
+            records.append(record)
+            db_file.write(", ".join(record) + "\n")
+
+        # Display the created database in table format
+        print("\nDatabase created with data:")
+        print("-" * (sum(column_widths.values()) + 3 * (len(fields) - 1)))  # Line separator
+        print(" | ".join(f"{field:^{column_widths[field]}}" for field in fields))  # Header row
+        print("-" * (sum(column_widths.values()) + 3 * (len(fields) - 1)))  # Line separator
+        for record in records:
+            print(" | ".join(f"{record[i]:<{column_widths[fields[i]]}}" for i in range(len(record))))  # Data rows
+
+        print("-" * (sum(column_widths.values()) + 3 * (len(fields) - 1)))  # Final line separator
+
+def edit_record(db_name):
+    """
+    Allows the user to edit a specific record in the specified database.
+    Prompts the user to search for a record, displays matching records,
+    and lets the user modify data of the chosen record.
+    Updates the database file with the new data.
+
+    """
+    try:
+        with open(f"{db_name}.txt", "r") as f:
+            lines = f.readlines()
+    except FileNotFoundError:
+        print("Database file not found.")
+        return
+
+    if len(lines) <= 1: #checking if records are present or not
+        print("No records found to edit.")
+        return
+
+    header = lines[0].strip()
+    records = lines[1:]
+    fields = header.split(", ")
+
+    # Search for a record which the user wants to edit
+    search_query = input("\nEnter a keyword or value to find the record you want to edit: ").strip()
+    matching_records = []
+    for i in range(len(records)):
+        if search_query.lower() in records[i].lower():
+            matching_records.append((i, records[i].strip()))
+
+    if not matching_records:
+        print("No matching records found.")
+        return
+
+    # Displaying the records which are matched with the inputted keyword
+    print("\nMatching records:")
+    for idx in range(len(matching_records)):
+        print(f"{idx + 1}. {matching_records[idx][1]}")
+
+    # Select a record to edit
+    while True:
+        try:
+           choice = int(input("Select a record number to edit (or 0 to cancel): ")) - 1
+           if choice == -1:
+               return
+           elif choice>=0:
+               break
+           else:
+               print("Invalid input. Try again")
+        except (ValueError, IndexError):
+            print("Invalid input. Try again")
+    line_to_edit, record_to_edit = matching_records[choice]
+
+    # Edit the record
+    updated_record = []
+    record_data = record_to_edit.split(", ")
+    for i in range(len(fields)):
+        # asking the user for the new values and if user enters without giving any value, the updated value will remain the same as previous value
+        new_value = input(f"{fields[i]} (current: {record_data[i]}): ").strip() or record_data[i]
+        updated_record.append(new_value)
+
+    # Save the changes in the file
+    records[line_to_edit] = ", ".join(updated_record) + "\n"
+    with open(f"{db_name}.txt", "w") as f:
+        f.write(header + "\n")
+        f.writelines(records)
+
+    print("\nRecord updated successfully.")
+
+def search_record(db_name):
+    """
+    Searches for records in the specified database based on user input.
+
+    Prompts the user to enter a search query, finds matching records,
+    and displays them in a formatted table.
+    """
+
+    try:
+        with open(f"{db_name}.txt", "r") as f:
+            lines = f.readlines()
+    except FileNotFoundError:
+        print("Database file not found.")
+        return
+
+    if len(lines) <= 1:
+        print("No records found to search.")
+        return
+
+    header = lines[0].strip()
+    records = lines[1:]
+    fields = header.split(", ")
+
+    # Search for a record
+    search_query = input("\nEnter a keyword or value to find the record you want to search: ").strip()
+    matching_records = []
+    for record in records:
+        if search_query.lower() in record.lower():
+            matching_records.append(record.strip().split(","))
+
+    if not matching_records:
+        print("No matching records found.")
+        return
+
+    #reading the column widths from the config.file of that database
+    try:
+        with open(f'{db_name}_config.txt',"r") as config_file:
+            column_widths = {line.split(":")[0]: int(line.split(":")[1]) for line in config_file}
+    except FileNotFoundError:
+        print("Configuration file not found. Cannot determine column widths.")
+        return
+
+    # displaying the search records in table format as done before
+    print("-" * (sum(column_widths.values()) + 3 * (len(fields) - 1)))
+    print(" | ".join(f"{field:^{column_widths[field]}}" for field in fields))
+    print("-" * (sum(column_widths.values()) + 3 * (len(fields) - 1)))
+    for record in matching_records:
+        print(" | ".join(f"{record[i]:<{column_widths[fields[i]]}}" for i in range(len(record))))
+    print("-" * (sum(column_widths.values()) + 3 * (len(fields) - 1)))
+
+def open_database():
+    """
+    Allows the user to select and interact with an existing database.
+
+    Displays a list of available databases, lets the user choose one,
+    and provides options to display, edit, delete, add, or search records
+    in the selected database.
+    """
+    try:
+        # Read all database names from the config file
+        with open("databases_config.txt", "r") as config_file:
+            databases = [line.strip() for line in config_file if line.strip()]
+
+        # Show all databases to the user
+        if not databases:
+            print("No databases found! Please create a database first.")
+            return
+
+        print("\nExisting Databases:") # listing all the existing databases
+        index = 1
+        for db_name in databases:
+            print(f"{index}. {db_name}")
+            index += 1
+
+        # Ask user to select a database
+        choice = input("\nEnter the name of the database to open: ").strip()
+        if choice not in databases:
+            print("Invalid choice! Please try again.")
+            return
+
+        with open(f"{choice}.txt", "r") as db_file, open(f"{choice}_config.txt", "r") as config_file:
+            # Read fields and records
+            fields = db_file.readline().strip().split(", ")
+            records = [line.strip().split(", ") for line in db_file if line.strip()]
+            column_widths = {line.split(":")[0]: int(line.split(":")[1]) for line in config_file}
+
+        # Display all options for the data manipulation
+        opr = int(input('''\nEnter your choice: 
+        1. Display all the records of this database
+        2. Delete a particular record
+        3. Edit a particular record
+        4. Add a new record
+        5. Search a particular record \n'''))
+
+        if opr == 1: # To display all records
+
+            # Open the selected database file
+            with open(f"{choice}.txt", "r") as db_file, open(f"{choice}_config.txt", "r") as config_file:
+                # Read fields and records
+                fields = db_file.readline().strip().split(", ")
+                records = [line.strip().split(", ") for line in db_file if line.strip()]
+                column_widths = {line.split(":")[0]: int(line.split(":")[1]) for line in config_file}
+
+                # Display the database in table format
+                print("\nContents of the database:")
+                print("-" * (sum(column_widths.values()) + 3 * (len(fields) - 1)))
+                print(" | ".join(f"{field:^{column_widths[field]}}" for field in fields))
+                print("-" * (sum(column_widths.values()) + 3 * (len(fields) - 1)))
+                for record in records:
+                    print(" | ".join(f"{record[i]:<{column_widths[fields[i]]}}" for i in range(len(record))))
+                print("-" * (sum(column_widths.values()) + 3 * (len(fields) - 1)))
+
+        elif opr == 2: # To delete records
+            try:
+                # Read the database file
+                with open(f"{db_name}.txt", "r") as f:
+                    lines = f.readlines()
+
+                if len(lines) <= 1:  # No records in the file (header only)
+                    print("No records found to delete.")
+                    return
+
+                # Split the file into header and records
+                header = lines[0].strip()
+                records = lines[1:]
+
+                # Search for a record to delete
+                search_query = input("\nEnter a keyword or value to find the record you want to delete: ").strip()
+                matching_indices = []
+                counter = 1
+
+                print("\nMatching Records Found:")
+                for i in range(len(records)):
+                    if search_query.lower() in records[i].lower():
+                        print(f"{counter}. {records[i].strip()}")
+                        matching_indices.append(i)
+                        counter += 1
+
+                if not matching_indices:
+                    print("No matching records found.")
+                    return
+
+                # Ask user to select a record to delete
+                try:
+                    choice = int(input("\nEnter the number of the record to delete (1-based index): ")) - 1
+                    if not (0 <= choice < len(matching_indices)):
+                        print(f"Invalid choice. Please select a number between 1 and {len(matching_indices)}.")
+                        return
+                except ValueError:
+                    print("Invalid input. Please enter a number.")
+                    return
+
+                # Delete the selected record
+                record_to_delete_idx = matching_indices[choice]
+                del records[record_to_delete_idx]
+
+                # Write updated records back to the file
+                with open(f"{db_name}.txt", "w") as f:
+                    f.write(header + "\n")  # Write header
+                    f.writelines(records)
+
+                print("Record deleted successfully!")
+
+            except FileNotFoundError:
+                print("Database file not found.")
+            except Exception as e:
+                print(f"An error occurred: {e}")
+
+        elif opr == 3:
+            edit_record(choice)
+
+        elif opr == 4: # Adding a new record
+            with open(f"{choice}.txt", "r+") as db_file, open(f"{choice}_config.txt", "r") as config_file:
+                # Read fields
+                fields = db_file.readline().strip().split(", ")
+                column_widths = {line.split(":")[0]: int(line.split(":")[1]) for line in config_file}
+
+                # Add a new record
+                new_record = []
+                for field in fields:
+                    data = input(f"Enter data for {field}: ").strip()
+                    new_record.append(data)
+
+                # Append the new record to the file
+                db_file.write(", ".join(new_record) + "\n")
+                print("\nNew record added successfully!")
+
+        elif opr == 5:
+            search_record(choice)
+
+        else:
+            print('You have entered an invalid choice. Please try again.')
+
+    except FileNotFoundError:
+        print("No databases found or file missing!")
+    except Exception as e:
+        print(f"An error occurred: {e}")
+
+# Main program loop
+while True:
+        while True:  # Loop to validate user input
+            try:
+                opt = int(input(''' Choose an option:
+    1. Create a database
+    2. Open an existing database
+    3. Exit
+    Your choice: '''))
+                break  # Exit the input validation loop if input is valid
+            except ValueError:
+                print("Invalid input! Please enter a number.")
+
+        if opt == 1:
+            create_database()
+        elif opt == 2:
+            open_database()
+        elif opt == 3:
+            print("Exiting the program. Goodbye!")
+            break
+        else:
+            print("Invalid option. Please try again.")
