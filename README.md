@@ -1,2 +1,2 @@
 # DBMS
-Pyhton DBMS
+Python DBMS
